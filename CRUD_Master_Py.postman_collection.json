@@ -1,0 +1,643 @@
+{
+  "info": {
+    "_postman_id": "d4e5f6a7-b8c9-40d1-a2e3-f4a5b6c7d8e9",
+    "name": "CRUD Master - Complete API Audit",
+    "description": "Complete ordered audit collection for the direct Inventory API and all public API Gateway endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "inventoryUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "gatewayUrl",
+      "value": "http://localhost:5002",
+      "type": "string"
+    },
+    {
+      "key": "inventory_movie_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gateway_movie_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Inventory API",
+      "description": "Direct Inventory API CRUD and filtering tests.",
+      "item": [
+        {
+          "name": "1. Create Movie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Created movie is returned and its ID is saved', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('id');",
+                  "    pm.expect(data.title).to.eql('Postman Inventory Audit Movie');",
+                  "    pm.expect(data.description).to.eql('Created directly through Inventory');",
+                  "    pm.collectionVariables.set('inventory_movie_id', data.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Inventory Audit Movie\",\n  \"description\": \"Created directly through Inventory\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{inventoryUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "2. Get All Movies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains the created movie', function () {",
+                  "    const data = pm.response.json();",
+                  "    const id = Number(pm.collectionVariables.get('inventory_movie_id'));",
+                  "    pm.expect(data).to.be.an('array');",
+                  "    pm.expect(data.some(movie => movie.id === id)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "3. Filter Movies By Title",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Every result matches the title filter', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.be.an('array').that.is.not.empty;",
+                  "    data.forEach(movie => pm.expect(movie.title.toLowerCase()).to.include('inventory audit'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies?title=Inventory%20Audit"
+          }
+        },
+        {
+          "name": "4. Get Movie By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returned movie ID matches the saved ID', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(String(data.id)).to.eql(String(pm.collectionVariables.get('inventory_movie_id')));",
+                  "    pm.expect(data.title).to.eql('Postman Inventory Audit Movie');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies/{{inventory_movie_id}}"
+          }
+        },
+        {
+          "name": "5. Update Movie By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Movie fields are updated', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.title).to.eql('Postman Inventory Audit Movie Updated');",
+                  "    pm.expect(data.description).to.eql('Updated directly through Inventory');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Inventory Audit Movie Updated\",\n  \"description\": \"Updated directly through Inventory\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{inventoryUrl}}/api/movies/{{inventory_movie_id}}/"
+          }
+        },
+        {
+          "name": "6. Delete Movie By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Deletion confirmation is returned', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.message).to.include('deleted successfully');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies/{{inventory_movie_id}}"
+          }
+        },
+        {
+          "name": "7. Confirm Deleted Movie Returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('Movie-not-found error is returned', function () {",
+                  "    pm.expect(pm.response.json().error).to.eql('Movie not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies/{{inventory_movie_id}}"
+          }
+        },
+        {
+          "name": "8. Create Movie For Delete-All Test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Cleanup movie is created', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('id');",
+                  "    pm.expect(data.title).to.eql('Postman Inventory Delete All Movie');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Inventory Delete All Movie\",\n  \"description\": \"Temporary cleanup record\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{inventoryUrl}}/api/movies"
+          }
+        },
+        {
+          "name": "9. Delete All Movies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Delete-all confirmation is returned', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.message).to.match(/^Successfully deleted all [1-9][0-9]* movies[.]$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "10. Confirm Inventory Is Empty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an empty array', function () {",
+                  "    pm.expect(pm.response.json()).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{inventoryUrl}}/api/movies"
+          }
+        }
+      ]
+    },
+    {
+      "name": "API Gateway",
+      "description": "Gateway movie proxy and billing publication tests.",
+      "item": [
+        {
+          "name": "1. Create Movie Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Created movie is returned and its ID is saved', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('id');",
+                  "    pm.expect(data.title).to.eql('Postman Gateway Audit Movie');",
+                  "    pm.expect(data.description).to.eql('Created through the Gateway');",
+                  "    pm.collectionVariables.set('gateway_movie_id', data.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Gateway Audit Movie\",\n  \"description\": \"Created through the Gateway\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{gatewayUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "2. Get All Movies Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains the created movie', function () {",
+                  "    const data = pm.response.json();",
+                  "    const id = Number(pm.collectionVariables.get('gateway_movie_id'));",
+                  "    pm.expect(data).to.be.an('array');",
+                  "    pm.expect(data.some(movie => movie.id === id)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "3. Filter Movies By Title Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Every result matches the title filter', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.be.an('array').that.is.not.empty;",
+                  "    data.forEach(movie => pm.expect(movie.title.toLowerCase()).to.include('gateway audit'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies?title=Gateway%20Audit"
+          }
+        },
+        {
+          "name": "4. Get Movie By ID Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returned movie ID matches the saved ID', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(String(data.id)).to.eql(String(pm.collectionVariables.get('gateway_movie_id')));",
+                  "    pm.expect(data.title).to.eql('Postman Gateway Audit Movie');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies/{{gateway_movie_id}}"
+          }
+        },
+        {
+          "name": "5. Update Movie By ID Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Movie fields are updated', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data.title).to.eql('Postman Gateway Audit Movie Updated');",
+                  "    pm.expect(data.description).to.eql('Updated through the Gateway');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Gateway Audit Movie Updated\",\n  \"description\": \"Updated through the Gateway\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{gatewayUrl}}/api/movies/{{gateway_movie_id}}/"
+          }
+        },
+        {
+          "name": "6. Delete Movie By ID Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Deletion confirmation is returned', function () {",
+                  "    pm.expect(pm.response.json().message).to.include('deleted successfully');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies/{{gateway_movie_id}}"
+          }
+        },
+        {
+          "name": "7. Confirm Deleted Movie Returns 404 Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('Inventory error is preserved', function () {",
+                  "    pm.expect(pm.response.json().error).to.eql('Movie not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies/{{gateway_movie_id}}"
+          }
+        },
+        {
+          "name": "8. Create Movie For Gateway Delete-All Test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Cleanup movie is created', function () {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('id');",
+                  "    pm.expect(data.title).to.eql('Postman Gateway Delete All Movie');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Gateway Delete All Movie\",\n  \"description\": \"Temporary cleanup record\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{gatewayUrl}}/api/movies"
+          }
+        },
+        {
+          "name": "9. Delete All Movies Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Delete-all confirmation is preserved', function () {",
+                  "    pm.expect(pm.response.json().message).to.match(/^Successfully deleted all [1-9][0-9]* movies[.]$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies/"
+          }
+        },
+        {
+          "name": "10. Confirm Gateway Inventory Is Empty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an empty array', function () {",
+                  "    pm.expect(pm.response.json()).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/movies"
+          }
+        },
+        {
+          "name": "11. Queue Billing Message Through Gateway",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Queue confirmation is returned', function () {",
+                  "    pm.expect(pm.response.json().message).to.eql('Message posted');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"20\",\n  \"number_of_items\": \"99\",\n  \"total_amount\": \"250\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{gatewayUrl}}/api/billing/"
+          }
+        }
+      ]
+    }
+  ]
+}
