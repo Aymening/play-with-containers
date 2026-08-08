@@ -9,10 +9,8 @@ info:
     API, while billing requests are published to RabbitMQ.
 
 servers:
-  - url: http://localhost:5002
-    description: Host access through the Vagrant forwarded port
-  - url: http://192.168.56.10:5002
-    description: API Gateway on the Vagrant private network
+  - url: http://localhost:3000
+    description: Public API Gateway endpoint exposed by Docker Compose
 
 tags:
   - name: Movies
