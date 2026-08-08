@@ -1,7 +1,9 @@
+import os
+
 from app import create_app
 
 app = create_app()
 
 if __name__ == "__main__":
-    # Configured to run on Port 8080 as required by specification
-    app.run(host="0.0.0.0", port=8080)
+    port = int(os.getenv("INVENTORY_PORT", "8080"))
+    app.run(host="0.0.0.0", port=port)

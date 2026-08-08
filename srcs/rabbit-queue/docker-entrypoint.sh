@@ -1,109 +1,89 @@
 #!/bin/sh
-set -eu
+set -e
 
-require_environment() {
-    variable_name="$1"
-    variable_value="$(printenv "$variable_name" || true)"
-    if [ -z "$variable_value" ]; then
-        echo "Missing required environment variable: $variable_name" >&2
+# Check the settings we need.
+if [ -z "${RABBITMQ_USER:-}" ]; then
+    echo "RABBITMQ_USER is required" >&2
+    exit 1
+fi
+
+if [ -z "${RABBITMQ_PASSWORD:-}" ]; then
+    echo "RABBITMQ_PASSWORD is required" >&2
+    exit 1
+fi
+
+if [ -z "${RABBITMQ_QUEUE:-}" ]; then
+    echo "RABBITMQ_QUEUE is required" >&2
+    exit 1
+fi
+
+if [ "$RABBITMQ_USER" = "guest" ]; then
+    echo "Do not use guest as RABBITMQ_USER" >&2
+    exit 1
+fi
+
+# Simple names make the queue URL safe.
+case "$RABBITMQ_USER$RABBITMQ_QUEUE" in
+    *[!A-Za-z0-9._-]*)
+        echo "RabbitMQ user and queue names contain invalid characters" >&2
         exit 1
-    fi
-}
+        ;;
+esac
 
-as_rabbitmq() {
-    runuser -u rabbitmq -- "$@"
-}
+mkdir -p "$RABBITMQ_MNESIA_BASE"
+chown -R rabbitmq:rabbitmq /var/lib/rabbitmq
 
-wait_for_broker() {
-    attempts=0
-    until as_rabbitmq rabbitmq-diagnostics -q ping >/dev/null 2>&1; do
-        attempts=$((attempts + 1))
-        if [ "$attempts" -ge 60 ]; then
-            echo "RabbitMQ did not become ready during initialization" >&2
-            return 1
+MARKER_FILE=/var/lib/rabbitmq/.initialized
+
+# Run this setup only for a new RabbitMQ volume.
+if [ ! -f "$MARKER_FILE" ]; then
+    echo "Starting RabbitMQ for first-time setup"
+    runuser -u rabbitmq -- rabbitmq-server -detached
+
+    # Wait until RabbitMQ is ready.
+    READY=false
+    for attempt in $(seq 1 60); do
+        if runuser -u rabbitmq -- rabbitmq-diagnostics -q check_running >/dev/null 2>&1; then
+            READY=true
+            break
         fi
         sleep 2
     done
-}
 
-declare_queue() {
-    queue_url="http://127.0.0.1:15672/api/queues/%2F/$RABBITMQ_QUEUE"
-    attempts=0
-    until curl --fail --silent --show-error \
+    if [ "$READY" != "true" ]; then
+        echo "RabbitMQ did not start" >&2
+        exit 1
+    fi
+
+    # Create or update the application user.
+    if runuser -u rabbitmq -- rabbitmqctl -q list_users | awk -v user="$RABBITMQ_USER" '$1 == user { found = 1 } END { exit !found }'; then
+        runuser -u rabbitmq -- rabbitmqctl change_password "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
+    else
+        runuser -u rabbitmq -- rabbitmqctl add_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
+    fi
+
+    runuser -u rabbitmq -- rabbitmqctl set_permissions -p / "$RABBITMQ_USER" '.*' '.*' '.*'
+    runuser -u rabbitmq -- rabbitmqctl set_user_tags "$RABBITMQ_USER" management
+
+    # Create the durable billing queue through the local management API.
+    QUEUE_URL="http://127.0.0.1:15672/api/queues/%2F/$RABBITMQ_QUEUE"
+    curl --fail --retry 20 --retry-delay 2 \
+        --silent --show-error \
         --user "$RABBITMQ_USER:$RABBITMQ_PASSWORD" \
         --header 'content-type: application/json' \
         --request PUT \
         --data '{"durable":true,"auto_delete":false,"arguments":{}}' \
-        "$queue_url" >/dev/null; do
-        attempts=$((attempts + 1))
-        if [ "$attempts" -ge 30 ]; then
-            echo "RabbitMQ management API did not accept the queue declaration" >&2
-            return 1
-        fi
-        sleep 2
-    done
-}
+        "$QUEUE_URL"
 
-initialize_broker() {
-    require_environment RABBITMQ_USER
-    require_environment RABBITMQ_PASSWORD
-    require_environment RABBITMQ_QUEUE
+    # The application user does not need access to the management page.
+    runuser -u rabbitmq -- rabbitmqctl set_user_tags "$RABBITMQ_USER"
+    runuser -u rabbitmq -- rabbitmqctl delete_user guest || true
 
-    case "$RABBITMQ_USER" in
-        guest)
-            echo "RABBITMQ_USER must not use the default guest account" >&2
-            exit 1
-            ;;
-        *[!A-Za-z0-9._-]*|'')
-            echo "RABBITMQ_USER may contain only letters, numbers, dot, underscore, and hyphen" >&2
-            exit 1
-            ;;
-    esac
-
-    case "$RABBITMQ_QUEUE" in
-        *[!A-Za-z0-9._-]*|'')
-            echo "RABBITMQ_QUEUE may contain only letters, numbers, dot, underscore, and hyphen" >&2
-            exit 1
-            ;;
-    esac
-
-    mkdir -p "$RABBITMQ_MNESIA_BASE"
-    chown -R rabbitmq:rabbitmq /var/lib/rabbitmq
-
-    marker=/var/lib/rabbitmq/.container-initialized
-    if [ -f "$marker" ]; then
-        return
-    fi
-
-    echo "Initializing RabbitMQ user and durable queue"
-    as_rabbitmq rabbitmq-server -detached
-    trap 'as_rabbitmq rabbitmqctl shutdown >/dev/null 2>&1 || true' EXIT INT TERM
-    wait_for_broker
-
-    if as_rabbitmq rabbitmqctl -q list_users | awk -v user="$RABBITMQ_USER" '$1 == user { found = 1 } END { exit !found }'; then
-        as_rabbitmq rabbitmqctl change_password "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
-    else
-        as_rabbitmq rabbitmqctl add_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD"
-    fi
-    as_rabbitmq rabbitmqctl set_permissions -p / "$RABBITMQ_USER" '.*' '.*' '.*'
-    as_rabbitmq rabbitmqctl set_user_tags "$RABBITMQ_USER" management
-
-    declare_queue
-    as_rabbitmq rabbitmqctl set_user_tags "$RABBITMQ_USER"
-    if as_rabbitmq rabbitmqctl -q list_users | awk '$1 == "guest" { found = 1 } END { exit !found }'; then
-        as_rabbitmq rabbitmqctl delete_user guest
-    fi
-    as_rabbitmq rabbitmqctl shutdown
-    trap - EXIT INT TERM
-
-    touch "$marker"
-    chown rabbitmq:rabbitmq "$marker"
-    echo "RabbitMQ initialization complete"
-}
-
-if [ "${1:-}" = "rabbitmq-server" ]; then
-    initialize_broker
-    exec runuser -u rabbitmq -- "$@"
+    runuser -u rabbitmq -- rabbitmqctl shutdown
+    touch "$MARKER_FILE"
+    chown rabbitmq:rabbitmq "$MARKER_FILE"
+    echo "RabbitMQ setup finished"
 fi
 
-exec "$@"
+# Start RabbitMQ as a non-root user.
+exec runuser -u rabbitmq -- "$@"
