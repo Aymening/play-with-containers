@@ -1,6 +1,17 @@
 from flask import current_app as app, request, jsonify
+from sqlalchemy import text
 from . import db
 from .models import Movie
+
+
+@app.get('/health')
+def health():
+    try:
+        db.session.execute(text('SELECT 1'))
+        return jsonify({"status": "ok", "service": "inventory-app"}), 200
+    except Exception:
+        db.session.rollback()
+        return jsonify({"status": "unavailable", "service": "inventory-app"}), 503
 
 # 1. GET /api/movies & /api/movies/ (Get all or filter by ?title=[name])
 # 2. POST /api/movies & /api/movies/ (Create a new movie)

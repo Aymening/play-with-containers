@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,7 +29,14 @@ def create_app():
     port = os.environ['INVENTORY_DB_PORT']
     db_name = os.environ['INVENTORY_DB_NAME']
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = URL.create(
+        drivername='postgresql+psycopg2',
+        username=user,
+        password=password,
+        host=host,
+        port=int(port),
+        database=db_name,
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)

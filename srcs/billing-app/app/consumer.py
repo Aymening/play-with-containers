@@ -1,9 +1,12 @@
 import os
 import json
 import time
+from threading import Thread
 from decimal import Decimal
 import pika
 from dotenv import load_dotenv
+from flask import Flask, jsonify
+from sqlalchemy.exc import SQLAlchemyError
 from app.database import SessionLocal, Base, engine
 from app.models import Order
 
@@ -19,13 +22,38 @@ def required_environment(name):
 RABBITMQ_HOST = required_environment("RABBITMQ_HOST")
 RABBITMQ_PORT = int(required_environment("RABBITMQ_PORT"))
 RABBITMQ_USER = required_environment("RABBITMQ_USER")
-RABBITMQ_PASS = required_environment("RABBITMQ_PASS")
+RABBITMQ_PASSWORD = required_environment("RABBITMQ_PASSWORD")
 RABBITMQ_QUEUE = required_environment("RABBITMQ_QUEUE")
+SERVICE_PORT = int(os.getenv("BILLING_PORT", "8080"))
+SERVICE_READY = False
+
+
+def start_health_server():
+    health_app = Flask(__name__)
+
+    @health_app.get("/health")
+    def health():
+        status = "ok" if SERVICE_READY else "starting"
+        status_code = 200 if SERVICE_READY else 503
+        return jsonify({"status": status, "service": "billing-app"}), status_code
+
+    thread = Thread(
+        target=health_app.run,
+        kwargs={"host": "0.0.0.0", "port": SERVICE_PORT, "debug": False, "use_reloader": False},
+        daemon=True,
+    )
+    thread.start()
 
 
 def init_db():
     """Ensure database tables exist before consuming messages."""
-    Base.metadata.create_all(bind=engine)
+    while True:
+        try:
+            Base.metadata.create_all(bind=engine)
+            return
+        except SQLAlchemyError as error:
+            print(f" [!] Billing database not ready: {error}; retrying in 5 seconds...", flush=True)
+            time.sleep(5)
 
 
 def process_message(ch, method, properties, body):
@@ -64,9 +92,12 @@ def process_message(ch, method, properties, body):
 
 def start_consumer():
     """Starts listening to RabbitMQ and consumes all pending & new messages."""
+    global SERVICE_READY
+
+    start_health_server()
     init_db()
     
-    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
+    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
     parameters = pika.ConnectionParameters(
         host=RABBITMQ_HOST,
         port=RABBITMQ_PORT,
@@ -95,6 +126,7 @@ def start_consumer():
         auto_ack=False  # Explicit manual acknowledgment
     )
 
+    SERVICE_READY = True
     print(f" [*] Billing API service started. Waiting for messages in '{RABBITMQ_QUEUE}'...")
     try:
         channel.start_consuming()
