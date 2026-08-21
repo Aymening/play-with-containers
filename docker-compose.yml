@@ -1,0 +1,127 @@
+name: play-with-containers
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - play-with-containers
+
+services:
+  inventory-db:
+    <<: *service-defaults
+    image: inventory-db
+    build:
+      context: .
+      dockerfile: srcs/inventory-db/Dockerfile
+    environment:
+      POSTGRES_USER: ${INVENTORY_DB_USER}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      POSTGRES_DB: ${INVENTORY_DB_NAME}
+    volumes:
+      - inventory-db:/var/lib/postgresql/data
+
+  billing-db:
+    <<: *service-defaults
+    image: billing-db
+    build:
+      context: .
+      dockerfile: srcs/billing-db/Dockerfile
+    environment:
+      POSTGRES_USER: ${BILLING_DB_USER}
+      POSTGRES_PASSWORD: ${BILLING_DB_PASSWORD}
+      POSTGRES_DB: ${BILLING_DB_NAME}
+    volumes:
+      - billing-db:/var/lib/postgresql/data
+
+  rabbit-queue:
+    <<: *service-defaults
+    image: rabbit-queue
+    build:
+      context: .
+      dockerfile: srcs/rabbit-queue/Dockerfile
+    environment:
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-billing_queue}
+    volumes:
+      - rabbit-queue:/var/lib/rabbitmq
+
+  inventory-app:
+    <<: *service-defaults
+    image: inventory-app
+    build:
+      context: .
+      dockerfile: srcs/inventory-app/Dockerfile
+    environment:
+      INVENTORY_DB_USER: ${INVENTORY_DB_USER}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+      INVENTORY_DB_HOST: inventory-db
+      INVENTORY_DB_PORT: 5432
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME}
+      INVENTORY_PORT: 8080
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+
+  billing-app:
+    <<: *service-defaults
+    image: billing-app
+    build:
+      context: .
+      dockerfile: srcs/billing-app/Dockerfile
+    environment:
+      BILLING_DB_USER: ${BILLING_DB_USER}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      BILLING_DB_HOST: billing-db
+      BILLING_DB_PORT: 5432
+      BILLING_DB_NAME: ${BILLING_DB_NAME}
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-billing_queue}
+      BILLING_PORT: 8080
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbit-queue:
+        condition: service_healthy
+
+  api-gateway-app:
+    <<: *service-defaults
+    image: api-gateway-app
+    build:
+      context: .
+      dockerfile: srcs/api-gateway-app/Dockerfile
+    environment:
+      INVENTORY_SERVICE_URL: http://inventory-app:8080
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-billing_queue}
+      GATEWAY_PORT: 3000
+      GATEWAY_LOG_FILE: /var/log/api-gateway/access.log
+    depends_on:
+      inventory-app:
+        condition: service_healthy
+      rabbit-queue:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_PORT:-3000}:3000"
+    volumes:
+      - api-gateway-app:/var/log/api-gateway
+
+volumes:
+  inventory-db:
+    name: inventory-db
+  billing-db:
+    name: billing-db
+  rabbit-queue:
+    name: rabbit-queue
+  api-gateway-app:
+    name: api-gateway-app
+
+networks:
+  play-with-containers:
+    name: play-with-containers
+    driver: bridge

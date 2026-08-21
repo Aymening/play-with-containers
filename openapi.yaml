@@ -242,7 +242,7 @@ paths:
                 missingFields:
                   value:
                     error: "Missing required fields: total_amount"
-        "500":
+        "503":
           description: The Gateway could not publish the message to RabbitMQ.
           content:
             application/json:
