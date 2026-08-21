@@ -51,13 +51,13 @@ Set strong, unique passwords in the ignored `.env` file:
 
 ```dotenv
 INVENTORY_DB_USER=inventory_user
-INVENTORY_DB_PASSWORD=replace_with_a_strong_password
+INVENTORY_DB_PASSWORD=
 INVENTORY_DB_NAME=inventory
 BILLING_DB_USER=billing_user
-BILLING_DB_PASSWORD=replace_with_a_different_password
+BILLING_DB_PASSWORD=
 BILLING_DB_NAME=billing
 RABBITMQ_USER=app_user
-RABBITMQ_PASSWORD=replace_with_another_password
+RABBITMQ_PASSWORD=
 RABBITMQ_QUEUE=billing_queue
 GATEWAY_PORT=3000
 ```
