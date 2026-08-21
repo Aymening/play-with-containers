@@ -1,16 +1,14 @@
 import os
 import json
 import time
-from threading import Thread
 from decimal import Decimal
+from threading import Thread
+
 import pika
-from dotenv import load_dotenv
 from flask import Flask, jsonify
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import SessionLocal, Base, engine
 from app.models import Order
-
-load_dotenv()
 
 def required_environment(name):
     value = os.getenv(name)
@@ -46,7 +44,6 @@ def start_health_server():
 
 
 def init_db():
-    """Ensure database tables exist before consuming messages."""
     while True:
         try:
             Base.metadata.create_all(bind=engine)
@@ -56,19 +53,16 @@ def init_db():
             time.sleep(5)
 
 
-def process_message(ch, method, properties, body):
-    """Callback triggered whenever a message is received from RabbitMQ."""
+def process_message(ch, method, _properties, body):
     session = SessionLocal()
     try:
         data = json.loads(body.decode('utf-8'))
         print(f" [x] Received order message: {data}")
 
-        # Extract values
         user_id = str(data.get("user_id"))
         number_of_items = int(data["number_of_items"])
         total_amount = Decimal(str(data["total_amount"]))
 
-        # Save to database
         new_order = Order(
             user_id=user_id,
             number_of_items=number_of_items,
@@ -78,20 +72,17 @@ def process_message(ch, method, properties, body):
         session.commit()
         print(" [✓] Order successfully inserted into orders table.")
 
-        # Manual Acknowledgement: Notify RabbitMQ to remove message from queue
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    except Exception as e:
-        print(f" [!] Error processing message: {e}")
+    except Exception as error:
+        print(f" [!] Error processing message: {error}", flush=True)
         session.rollback()
-        # Nack without requeue if malformed, or requeue depending on design choice
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     finally:
         session.close()
 
 
 def start_consumer():
-    """Starts listening to RabbitMQ and consumes all pending & new messages."""
     global SERVICE_READY
 
     start_health_server()
@@ -105,7 +96,6 @@ def start_consumer():
         heartbeat=600
     )
 
-    # Retry mechanism in case RabbitMQ is booting up
     while True:
         try:
             connection = pika.BlockingConnection(parameters)
@@ -117,13 +107,12 @@ def start_consumer():
     channel = connection.channel()
     channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
 
-    # Ensure consumer gets one message at a time to guarantee safe processing
     channel.basic_qos(prefetch_count=1)
 
     channel.basic_consume(
         queue=RABBITMQ_QUEUE,
         on_message_callback=process_message,
-        auto_ack=False  # Explicit manual acknowledgment
+        auto_ack=False
     )
 
     SERVICE_READY = True

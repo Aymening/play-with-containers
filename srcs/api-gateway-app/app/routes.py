@@ -1,7 +1,8 @@
 import os
-import requests
+
 import pika
-from flask import Blueprint, request, Response, jsonify
+import requests
+from flask import Blueprint, Response, jsonify, request
 
 gateway_bp = Blueprint('gateway', __name__)
 
@@ -9,6 +10,7 @@ gateway_bp = Blueprint('gateway', __name__)
 @gateway_bp.get('/health')
 def health():
     return jsonify({"status": "ok", "service": "api-gateway-app"}), 200
+
 
 def required_environment(name):
     value = os.getenv(name)
@@ -48,8 +50,6 @@ def publish_to_rabbitmq(message_body):
             connection.close()
 
 
-# Inventory HTTP Proxy - Supporting all methods and path formats:
-# /api/movies, /api/movies/, /api/movies/<id>, /api/movies/<id>/
 @gateway_bp.route(
     '/api/movies',
     defaults={'path': ''},
@@ -73,9 +73,8 @@ def proxy_to_inventory(path):
             method=request.method,
             url=target_url,
             headers=headers,
-            params=request.args,       # Forwards query params like ?title=...
-            data=request.get_data(),   # Forwards body JSON
-            cookies=request.cookies,
+            params=request.args,
+            data=request.get_data(),
             allow_redirects=False,
             timeout=10
         )
@@ -83,15 +82,12 @@ def proxy_to_inventory(path):
         resp_headers = [(name, value) for (name, value) in resp.raw.headers.items()
                         if name.lower() not in excluded_headers]
         
-        # Preserves exact payload, HTTP status code, and headers
         return Response(resp.content, resp.status_code, resp_headers)
     except requests.exceptions.RequestException:
         return jsonify({"error": "Inventory service unavailable"}), 503
 
 
-# Billing RabbitMQ Queue Proxy
-@gateway_bp.route('/api/billing', methods=['POST'])
-@gateway_bp.route('/api/billing/', methods=['POST'])
+@gateway_bp.route('/api/billing', methods=['POST'], strict_slashes=False)
 def proxy_to_billing():
     if not request.is_json:
         return jsonify({"error": "Content-Type must be application/json"}), 400

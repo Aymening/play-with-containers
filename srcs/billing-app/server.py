@@ -1,5 +1,4 @@
-from app import create_billing_app
+from app.consumer import start_consumer
 
 if __name__ == "__main__":
-    run_consumer = create_billing_app()
-    run_consumer()
+    start_consumer()
