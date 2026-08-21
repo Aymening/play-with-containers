@@ -8,9 +8,9 @@ Use this checklist to track the mandatory work for the project. Complete the CRU
 - [x] Keep the API Gateway responsible for public movie and billing requests.
 - [x] Keep the Billing application responsible for consuming RabbitMQ messages and storing orders.
 - [x] Remove unused CRUD-master code, comments, dependencies, and scripts.
-- [ ] Test all Inventory CRUD operations locally.
-- [ ] Test billing message validation and database insertion locally.
-- [ ] Confirm each application reads credentials and service addresses from environment variables.
+- [x] Test all Inventory CRUD operations locally.
+- [x] Test billing message validation and database insertion locally.
+- [x] Confirm each application reads credentials and service addresses from environment variables.
 
 ## 2. Create the six required containers
 
