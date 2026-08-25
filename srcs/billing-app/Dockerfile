@@ -1,26 +1,20 @@
 FROM debian:12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        python3 \
-        python3-pip \
-        python3-venv \
-        ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m venv /opt/venv \
-    && useradd --create-home --shell /usr/sbin/nologin appuser
+    && useradd --create-home appuser
 
-ENV PATH=/opt/venv/bin:$PATH \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PATH=/opt/venv/bin:$PATH
 
 WORKDIR /app
 
 COPY srcs/billing-app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=appuser:appuser srcs/billing-app/app ./app
-COPY --chown=appuser:appuser srcs/billing-app/server.py .
+COPY srcs/billing-app/app ./app
+COPY srcs/billing-app/server.py .
 
 USER appuser
 

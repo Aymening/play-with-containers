@@ -1,15 +1,12 @@
 FROM debian:12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        python3 \
-        python3-pip \
-        python3-venv \
-        ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a small Python environment for the app.
-RUN python3 -m venv /opt/venv
+RUN python3 -m venv /opt/venv \
+    && useradd --create-home appuser
+
 ENV PATH=/opt/venv/bin:$PATH
 
 WORKDIR /app
@@ -17,10 +14,9 @@ WORKDIR /app
 COPY srcs/inventory-app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run the app as a normal user instead of root.
-RUN useradd --create-home appuser
-COPY --chown=appuser:appuser srcs/inventory-app/app ./app
-COPY --chown=appuser:appuser srcs/inventory-app/server.py .
+COPY srcs/inventory-app/app ./app
+COPY srcs/inventory-app/server.py .
+
 USER appuser
 
 EXPOSE 8080

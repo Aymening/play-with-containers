@@ -1,17 +1,12 @@
 FROM debian:12-slim
 
-ARG DEBIAN_FRONTEND=noninteractive
-
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        postgresql-15 \
-        postgresql-client-15 \
-        ca-certificates \
+    && apt-get install -y --no-install-recommends postgresql-15 \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/lib/postgresql/15/main
 
-ENV PGDATA=/var/lib/postgresql/data
-ENV PATH=/usr/lib/postgresql/15/bin:$PATH
+ENV PGDATA=/var/lib/postgresql/data \
+    PATH=/usr/lib/postgresql/15/bin:$PATH
 
 COPY --chmod=755 srcs/database/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
